@@ -664,7 +664,7 @@ def Hyper_ML_Preg4(theta, X, y, mus, sigmas, deltas, flag_sc):
     LXLp1_detlog = suma(log(1+eigLXL))
     LMLp1_detlog = suma(log(1+eigLML))
     
-    alpha_lambda = 16/math.pow((math.sqrt(17) - 1) / 10, 2)
+    alpha_lambda = (16/math.pow((math.sqrt(17) - 1) / 10, 2))/100
     theta_lambda = (math.sqrt(17) - 1) / 10
     alpha_tau = 4 / math.pow((math.sqrt(5) - 1)/2 ,2)
     theta_tau = (math.sqrt(5) - 1) / 10
