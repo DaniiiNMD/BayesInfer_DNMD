@@ -18,8 +18,6 @@ from numpy.random import normal, chisquare, randint
 
 
 
-
-
 def get_yXform(data, lag, c=True):
     # Transforma la data en la representación MCO de un
     # VAR
@@ -368,7 +366,6 @@ def get_DumObsLitterman(lmbda, deltas, sigmas, lag):
     LC = vstack([zeros(((lag+1)*k, 1)), asarray([1.e-3])])
     Xd = hstack([Xd, LC])
 
-
     Td, _ = yd.shape
 
     return yd, Xd, Td
@@ -529,7 +526,8 @@ def get_sigmas(data, lag):
         sigmas[ii] = std(UU)
     return sigmas
 
-def Hyper_ML(theta, X, y, tau, mus, sigmas, deltas, flag_sc):
+
+def Hyper_ML(theta, X, y, mus, sigmas, deltas, flag_sc):
     T,k  = y.shape
     n,klagp1 = X.shape
     lag = (klagp1-1)//k
@@ -543,12 +541,12 @@ def Hyper_ML(theta, X, y, tau, mus, sigmas, deltas, flag_sc):
         Td = Td0+Td1
         yd = np.r_[yd0,yd1]
         Xd = np.r_[Xd0,Xd1]
-    
+
     else:
         yd, Xd, Td = get_DumObsLitterman(lmbda, deltas, sigmas, lag)
-        
+
     Text = T + Td
-    
+
     constants = -((k*T)/2)*log(pi) + suma( gammaln( (Text-n+1-(1+arange(k)))/2) ) - suma( gammaln( (Td-n+1-(1+arange(k)))/2) )
     
     Omegaprior = diag(1/diag(dot(Xd.T,Xd)))
