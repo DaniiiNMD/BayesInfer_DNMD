@@ -700,6 +700,16 @@ def Hyper_ML_Preg6(theta, X, y, mus, sigmas, deltas, flag_sc, dates):
     s2 = theta[4]
     rho = theta[5]
 
+    if flag_sc == True:
+        yd0, Xd0, Td0 = get_DumObsLitterman(lmbda, deltas, sigmas, lag)
+        yd1,Xd1,Td1 = get_DumObsSumCoef(tau, sigmas, mus, lag) #**
+        Td = Td0+Td1
+        yd = np.r_[yd0,yd1]
+        Xd = np.r_[Xd0,Xd1]
+
+    else:
+        yd, Xd, Td = get_DumObsLitterman(lmbda, deltas, sigmas, lag)
+
     # Lenza-Primiceri
     scale = np.ones(T)
     datesind = list(dates).index(pd.to_datetime('2020-01-01'))
@@ -708,21 +718,11 @@ def Hyper_ML_Preg6(theta, X, y, mus, sigmas, deltas, flag_sc, dates):
     scale[datesind+1] = s1
     scale[datesind+2] = s2
     
-    y = y / scale
-    X = X / scale
-    
     for i in range(0, T-datesind-3):
         scale[datesind+3+i] = 1 + (s2 - 1)* (rho ** (i+1))
-
-    if flag_sc == True:
-        yd0, Xd0, Td0 = get_DumObsLitterman(lmbda, deltas, sigmas, lag)
-        yd1,Xd1,Td1 = get_DumObsSumCoef(tau, sigmas, mus, lag) #****
-        Td = Td0+Td1
-        yd = np.r_[yd0,yd1]
-        Xd = np.r_[Xd0,Xd1]
-
-    else:
-        yd, Xd, Td = get_DumObsLitterman(lmbda, deltas, sigmas, lag)
+    
+    yd = yd / scale
+    Xd = Xd / scale
 
     Text = T + Td
 
