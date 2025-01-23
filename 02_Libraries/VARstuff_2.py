@@ -7,7 +7,7 @@
 
 # Funciones de librerías
 import numpy as np
-import math
+import pandas as pd
 from numpy import triu, diag, sqrt, asarray, arange
 from numpy import zeros, ones, std, real, log, vstack
 from numpy import eye, pi, hstack, concatenate, reshape
@@ -575,8 +575,8 @@ def Hyper_ML_Preg3(theta, X, y, mus, sigmas, deltas, flag_sc):
 
     if flag_sc == True:
         yd0, Xd0, Td0 = get_DumObsLitterman(lmbda, deltas, sigmas, lag)
-        yd1,Xd1,Td1 = get_DumObsSumCoef(tau, sigmas, mus, lag) #****
-        Td = Td0+Td1
+        yd1, Xd1, Td1 = get_DumObsSumCoef(tau, sigmas, mus, lag) #****
+        Td = Td0 + Td1
         yd = np.r_[yd0,yd1]
         Xd = np.r_[Xd0,Xd1]
 
@@ -628,6 +628,80 @@ def Hyper_ML_Preg4(theta, X, y, mus, sigmas, deltas, flag_sc):
 
     if flag_sc == True:
         yd0, Xd0, Td0 = get_DumObsLitterman(lmbda, deltas, sigmas, lag)
+        yd1, Xd1, Td1 = get_DumObsSumCoef(tau, sigmas, mus, lag) #****
+        Td = Td0 + Td1
+        yd = np.r_[yd0,yd1]
+        Xd = np.r_[Xd0,Xd1]
+
+    else:
+        yd, Xd, Td = get_DumObsLitterman(lmbda, deltas, sigmas, lag)
+
+    Text = T + Td
+
+    constants = -((k*T)/2)*log(pi) + suma( gammaln( (Text-n+1-(1+arange(k)))/2) ) - suma( gammaln( (Td-n+1-(1+arange(k)))/2) )
+    
+    Omegaprior = diag(1/diag(dot(Xd.T,Xd)))
+    Uprior = dot((eye(Td)-dot(Xd,dot(Omegaprior,Xd.T))),yd)
+    Sprior = diag(diag(dot(Uprior.T,Uprior)))
+    Sprior_logdet = suma(log(diag(Sprior)))
+    
+    yext = vstack((yd, y))
+    Xext = vstack((Xd, X))
+    
+    iOmegapost = dot(Xext.T,Xext)
+    Omegapost  = inv(iOmegapost)
+    Upost      = dot((eye(Text)-dot(Xext,dot(Omegapost,Xext.T))),yext)
+    Spost      = dot(Upost.T,Upost)
+    
+    LiS     = diag(1./sqrt(diag(Sprior)))
+    LOmega  = cholesky(Omegaprior)
+    M       = Spost-Sprior
+    LXL     = dot(LOmega.T,dot(dot(X.T,X),LOmega))
+    LML     = dot(LiS.T,dot(M,LiS))
+    
+    eigLXL  = real(eigvalsh(LXL))
+    eigLML  = real(eigvalsh(LML))
+    LXLp1_detlog = suma(log(1+eigLXL))
+    LMLp1_detlog = suma(log(1+eigLML))
+    
+    resto   = -(T/2)*Sprior_logdet - (k/2)*LXLp1_detlog - ((Text-n)/2)*LMLp1_detlog
+
+    logML = constants + resto
+
+    return logML
+
+
+
+def process2forecast(data):
+
+    data['p'] = np.exp(data['p']/100)
+    data['y'] = np.exp(data['y']/100)
+
+    data['infl']  = ( data['p'] / data['p'].shift(4) - 1 ) * 100
+    data['GDP']   = data['y'].rolling(window=4).sum()
+    data['gdp_gr'] = ( data['GDP'] / data['GDP'].shift(4) - 1 ) * 100
+
+    data = data[['infl', 'gdp_gr']]
+    data = np.array(data.loc['2021-01-01':,:])
+    
+    return data
+
+
+
+def Hyper_ML_Preg6(theta, X, y, mus, sigmas, deltas, flag_sc, dates):
+    T,k  = y.shape
+    n,klagp1 = X.shape
+    lag = (klagp1-1)//k
+
+    lmbda = theta[0]
+    tau = theta[1]
+    s0 = theta[2]
+    s1 = theta[3]
+    s2 = theta[4]
+    rho = theta[5]
+
+    if flag_sc == True:
+        yd0, Xd0, Td0 = get_DumObsLitterman(lmbda, deltas, sigmas, lag)
         yd1,Xd1,Td1 = get_DumObsSumCoef(tau, sigmas, mus, lag) #****
         Td = Td0+Td1
         yd = np.r_[yd0,yd1]
@@ -635,6 +709,20 @@ def Hyper_ML_Preg4(theta, X, y, mus, sigmas, deltas, flag_sc):
 
     else:
         yd, Xd, Td = get_DumObsLitterman(lmbda, deltas, sigmas, lag)
+
+    # Lenza-Primiceri
+    scale = np.ones(T)
+    datesind = list(dates).index(pd.to_datetime('2020-01-01'))
+    
+    scale[datesind]   = s0
+    scale[datesind+1] = s1
+    scale[datesind+2] = s2
+    
+    for i in range(0, T-datesind-3):
+        scale[datesind+3+i] = 1 + (s2 - 1)* (rho ** (i+1))
+    
+    yd = yd / scale
+    Xd = Xd / scale
 
     Text = T + Td
 
@@ -663,18 +751,12 @@ def Hyper_ML_Preg4(theta, X, y, mus, sigmas, deltas, flag_sc):
     eigLML  = real(eigvalsh(LML))
     LXLp1_detlog = suma(log(1+eigLXL))
     LMLp1_detlog = suma(log(1+eigLML))
-    
-    alpha_lambda = (16/math.pow((math.sqrt(17) - 1) / 10, 2))/100
-    theta_lambda = (math.sqrt(17) - 1) / 10
-    alpha_tau = 4 / math.pow((math.sqrt(5) - 1) ,2)
-    theta_tau = (math.sqrt(5) - 1) / 10
 
     resto   = -(T/2)*Sprior_logdet - (k/2)*LXLp1_detlog - ((Text-n)/2)*LMLp1_detlog
-    
-    resto_lambda_tau = (alpha_lambda-1)*log(lmbda) - (lmbda/theta_lambda) + (alpha_tau-1)*log(tau) - (tau/theta_tau)
-    
-    constante_lambda_tau = -gammaln(alpha_lambda) - alpha_lambda*log(theta_lambda) -gammaln(alpha_tau) - alpha_tau*log(theta_tau)
 
-    logML = constants + resto + constante_lambda_tau + resto_lambda_tau
+    logML = constants + resto
 
     return logML
+
+
+
